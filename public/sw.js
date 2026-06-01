@@ -3,7 +3,6 @@
 
 const CACHE_NAME = 'fer-cache-v1';
 
-// キャッシュするアプリシェル（相対パス）
 const SHELL = [
   '/fire-extinguisher-register/',
   '/fire-extinguisher-register/index.html',
@@ -12,27 +11,28 @@ const SHELL = [
   '/fire-extinguisher-register/icon-512.png',
 ];
 
-// ExcelJS の chunk は容量が大きいためキャッシュしない
+// ExcelJS chunk と Gemini API はキャッシュしない
 const SKIP_PATTERNS = [
-  'generativelanguage.googleapis.com',  // Gemini API はキャッシュ除外
+  'generativelanguage.googleapis.com',
   'exceljs',
 ];
 
 self.addEventListener('install', event => {
+  // cache.addAll は1件でも失敗するとインストール全体が失敗するため
+  // 個別に add して失敗を無視する（必須シェルのみキャッシュ）
   event.waitUntil(
-    caches.open(CACHE_NAME).then(cache => cache.addAll(SHELL))
+    caches.open(CACHE_NAME).then(cache =>
+      Promise.allSettled(SHELL.map(url => cache.add(url)))
+    ).then(() => self.skipWaiting())
   );
-  self.skipWaiting();
 });
 
 self.addEventListener('activate', event => {
   event.waitUntil(
-    // 古いキャッシュを削除
     caches.keys().then(keys =>
       Promise.all(keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k)))
-    )
+    ).then(() => self.clients.claim())
   );
-  self.clients.claim();
 });
 
 self.addEventListener('fetch', event => {
@@ -40,8 +40,7 @@ self.addEventListener('fetch', event => {
 
   // スキップ対象はネットワークオンリー
   if (SKIP_PATTERNS.some(p => url.includes(p))) {
-    event.respondWith(fetch(event.request));
-    return;
+    return; // デフォルトのネットワークフェッチに委ねる
   }
 
   // Cache-first
@@ -49,18 +48,16 @@ self.addEventListener('fetch', event => {
     caches.match(event.request).then(cached => {
       if (cached) return cached;
       return fetch(event.request).then(res => {
-        // 成功レスポンスはキャッシュに追加
         if (res.ok) {
           const clone = res.clone();
           caches.open(CACHE_NAME).then(cache => cache.put(event.request, clone));
         }
         return res;
-      }).catch(() => cached ?? new Response('Offline', { status: 503 }));
+      });
     })
   );
 });
 
-// 更新通知: 新しい SW がインストールされたらクライアントに通知
 self.addEventListener('message', event => {
   if (event.data === 'skipWaiting') self.skipWaiting();
 });
