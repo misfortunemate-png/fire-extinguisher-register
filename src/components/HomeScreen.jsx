@@ -9,7 +9,7 @@ import { exportIssueReport } from '../lib/export-xlsx.js';
 import { useToast } from '../hooks/useToast.js';
 import Toast from './Toast.jsx';
 
-export default function HomeScreen({ onSelectFacility, onSettings }) {
+export default function HomeScreen({ onSelectFacility, onSettings, installPrompt, onInstall }) {
   const [query, setQuery] = useState('');
   const { toasts, showToast, dismissToast } = useToast();
 
@@ -62,6 +62,11 @@ export default function HomeScreen({ onSelectFacility, onSettings }) {
           <span><strong style={{ color: '#fff' }}>{totalRegistered}</strong>/{totalRequired}本</span>
           {issueCount > 0 && <span style={{ color: '#fca5a5' }}>不具合 {issueCount}件</span>}
         </div>
+        {installPrompt && (
+          <button className="btn btn-primary btn-sm" onClick={onInstall} title="アプリをインストール">
+            インストール
+          </button>
+        )}
         <button onClick={onSettings} title="設定">⚙</button>
       </header>
 
